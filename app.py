@@ -86,7 +86,11 @@ else:
             st.write(user_input)
 
         # Call LLM
-        model = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite")
+        model = ChatGoogleGenerativeAI(
+    model="gemini-pro",
+    google_api_key=GOOGLE_API_KEY,
+    temperature=0.3)
+
         response = model.invoke(st.session_state.memory)
 
         # Store AI response
