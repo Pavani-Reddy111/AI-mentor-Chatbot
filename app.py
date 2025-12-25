@@ -88,7 +88,7 @@ else:
         # Call LLM
         model = ChatGoogleGenerativeAI(
     model="gemini-pro",
-    google_api_key=GOOGLE_API_KEY,
+    google_api_key=API_KEY,
     temperature=0.3)
 
         response = model.invoke(st.session_state.memory)
