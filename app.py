@@ -4,6 +4,16 @@ from dotenv import load_dotenv
 
 # ------------------ BASIC SETUP ------------------
 load_dotenv()
+# ✅ DEFINE API KEY FIRST
+API_KEY = os.getenv("GOOGLE_API_KEY")
+
+# Streamlit Cloud fallback
+if not API_KEY:
+    API_KEY = st.secrets.get("GOOGLE_API_KEY", None)
+
+if not API_KEY:
+    st.error("GOOGLE_API_KEY not found. Please add it to Streamlit Secrets.")
+    st.stop()
 
 st.set_page_config(page_title="AI Chatbot Mentor", page_icon="🤖")
 
