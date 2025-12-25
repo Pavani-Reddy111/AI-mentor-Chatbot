@@ -56,14 +56,13 @@ if st.session_state.module is None:
     if st.button("Start Mentoring"):
         st.session_state.module = module
 
+        # ✅ SIMPLE & STABLE SYSTEM PROMPT (Gemini-safe)
         system_prompt = f"""
-You are an AI Mentor dedicated ONLY to the learning module: {module}.
+You are an AI mentor for {module}.
 
-Rules:
-- Answer ONLY questions related to {module}.
-- If the question is outside {module}, reply EXACTLY with:
-"Sorry, I don’t know about this question. Please ask something related to the selected module."
-- Be clear, structured, and beginner-friendly.
+Only answer questions related to {module}.
+If a question is unrelated, politely say you can only help with {module}.
+Explain answers clearly for beginners.
 """
 
         st.session_state.messages = [SystemMessage(content=system_prompt)]
@@ -85,22 +84,29 @@ else:
     user_input = st.chat_input("Ask your question here")
 
     if user_input:
-        # Show user message
+        # Store user message
         st.session_state.chat.append({"role": "user", "content": user_input})
         st.session_state.messages.append(HumanMessage(content=user_input))
 
         with st.chat_message("user"):
             st.write(user_input)
 
-        # Invoke Gemini correctly
-        response = model.invoke(st.session_state.messages)
+        # ✅ SAFE GEMINI INVOCATION (NO CRASH)
+        try:
+            response = model.invoke(st.session_state.messages)
+            ai_reply = response.content
+        except Exception:
+            ai_reply = (
+                "Sorry, I encountered an internal error while answering. "
+                "Please try rephrasing your question."
+            )
 
         # Store AI response
-        st.session_state.chat.append({"role": "ai", "content": response.content})
-        st.session_state.messages.append(AIMessage(content=response.content))
+        st.session_state.chat.append({"role": "ai", "content": ai_reply})
+        st.session_state.messages.append(AIMessage(content=ai_reply))
 
         with st.chat_message("ai"):
-            st.write(response.content)
+            st.write(ai_reply)
 
     # ------------------ DOWNLOAD CHAT FEATURE ------------------
     if st.session_state.chat:
@@ -115,3 +121,4 @@ else:
             file_name=f"{st.session_state.module}_Chat_History.txt",
             mime="text/plain"
         )
+
