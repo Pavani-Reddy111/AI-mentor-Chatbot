@@ -1,9 +1,7 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
-
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 # ------------------ BASIC SETUP ------------------
 load_dotenv()
@@ -20,15 +18,12 @@ st.set_page_config(page_title="AI Chatbot Mentor", page_icon="🤖")
 if "module" not in st.session_state:
     st.session_state.module = None
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
 if "chat" not in st.session_state:
     st.session_state.chat = []
 
-# ------------------ MODEL INIT (ONCE) ------------------
+# ------------------ MODEL INIT ------------------
 model = ChatGoogleGenerativeAI(
-    model="gemini-pro",
+    model="gemini-pro",   # ✅ stable & supported
     google_api_key=API_KEY,
     temperature=0.3
 )
@@ -55,19 +50,7 @@ if st.session_state.module is None:
 
     if st.button("Start Mentoring"):
         st.session_state.module = module
-
-        # ✅ SIMPLE & STABLE SYSTEM PROMPT (Gemini-safe)
-        system_prompt = f"""
-You are an AI mentor for {module}.
-
-Only answer questions related to {module}.
-If a question is unrelated, politely say you can only help with {module}.
-Explain answers clearly for beginners.
-"""
-
-        st.session_state.messages = [SystemMessage(content=system_prompt)]
         st.session_state.chat = []
-
         st.rerun()
 
 # ------------------ MODULE CHAT INTERFACE ------------------
@@ -76,7 +59,7 @@ else:
     st.write(f"I am your dedicated mentor for **{st.session_state.module}**.")
     st.write("How can I help you today?")
 
-    # Display chat history
+    # Show chat history
     for msg in st.session_state.chat:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
@@ -86,14 +69,32 @@ else:
     if user_input:
         # Store user message
         st.session_state.chat.append({"role": "user", "content": user_input})
-        st.session_state.messages.append(HumanMessage(content=user_input))
 
         with st.chat_message("user"):
             st.write(user_input)
 
-        # ✅ SAFE GEMINI INVOCATION (NO CRASH)
+        # ------------------ BUILD PROMPT (GEMINI SAFE) ------------------
+        prompt = f"""
+You are an AI mentor for {st.session_state.module}.
+
+Rules:
+- Answer ONLY questions related to {st.session_state.module}.
+- If a question is unrelated, reply exactly:
+"Sorry, I don’t know about this question. Please ask something related to the selected module."
+- Explain clearly in a beginner-friendly way.
+
+Conversation so far:
+"""
+
+        for msg in st.session_state.chat:
+            role = "User" if msg["role"] == "user" else "AI"
+            prompt += f"{role}: {msg['content']}\n"
+
+        prompt += "\nAI:"
+
+        # ------------------ CALL GEMINI SAFELY ------------------
         try:
-            response = model.invoke(st.session_state.messages)
+            response = model.invoke(prompt)
             ai_reply = response.content
         except Exception:
             ai_reply = (
@@ -103,7 +104,6 @@ else:
 
         # Store AI response
         st.session_state.chat.append({"role": "ai", "content": ai_reply})
-        st.session_state.messages.append(AIMessage(content=ai_reply))
 
         with st.chat_message("ai"):
             st.write(ai_reply)
@@ -121,4 +121,3 @@ else:
             file_name=f"{st.session_state.module}_Chat_History.txt",
             mime="text/plain"
         )
-
