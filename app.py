@@ -94,7 +94,6 @@ Conversation so far:
 
         # ------------------ CALL GEMINI SAFELY ------------------
         try:
-            response = model.invoke(prompt)
             ai_reply = response.content
         except Exception:
             ai_reply = (
