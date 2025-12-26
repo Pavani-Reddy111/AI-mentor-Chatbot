@@ -1,16 +1,9 @@
-import os
 import streamlit as st
-from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
+from dotenv import load_dotenv
 
 # ------------------ BASIC SETUP ------------------
 load_dotenv()
-
-API_KEY = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
-
-if not API_KEY:
-    st.error("GOOGLE_API_KEY not found. Please add it to Streamlit Secrets.")
-    st.stop()
 
 st.set_page_config(page_title="AI Chatbot Mentor", page_icon="🤖")
 
@@ -21,12 +14,8 @@ if "module" not in st.session_state:
 if "chat" not in st.session_state:
     st.session_state.chat = []
 
-# ------------------ MODEL INIT ------------------
-model = ChatGoogleGenerativeAI(
-    model="gemini-pro",   # ✅ stable & supported
-    google_api_key=API_KEY,
-    temperature=0.3
-)
+if "memory" not in st.session_state:
+    st.session_state.memory = []
 
 # ------------------ WELCOME SCREEN ------------------
 if st.session_state.module is None:
@@ -50,7 +39,28 @@ if st.session_state.module is None:
 
     if st.button("Start Mentoring"):
         st.session_state.module = module
-        st.session_state.chat = []
+
+        # SYSTEM PROMPT (CORE OF DOMAIN CONTROL)
+        system_prompt = f"""
+You are an AI Mentor dedicated ONLY to the selected learning module: {module}.
+
+Your responsibility:
+- Decide whether the user's question belongs to the subject {module} itself.
+
+Rules:
+- If the question is about the concepts, ideas, methods, or topics that DEFINE {module}, answer it.
+- If the question is about any topic that does NOT belong to the subject {module}, do NOT answer it.
+- Do NOT assume a topic belongs to {module} just because it is commonly used together with it.
+- If the question is NOT about {module}, reply ONLY with this exact sentence:
+
+Sorry, I don’t know about this question. Please ask something related to the selected module.
+
+- For valid questions, explain clearly and in a beginner-friendly way.
+"""
+
+
+
+        st.session_state.memory.append(("system", system_prompt))
         st.rerun()
 
 # ------------------ MODULE CHAT INTERFACE ------------------
@@ -59,55 +69,34 @@ else:
     st.write(f"I am your dedicated mentor for **{st.session_state.module}**.")
     st.write("How can I help you today?")
 
-    # Show chat history
+    # Display chat history
     for msg in st.session_state.chat:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
 
+    # User input
     user_input = st.chat_input("Ask your question here")
 
     if user_input:
         # Store user message
         st.session_state.chat.append({"role": "user", "content": user_input})
+        st.session_state.memory.append(("user", user_input))
 
         with st.chat_message("user"):
             st.write(user_input)
 
-        # ------------------ BUILD PROMPT (GEMINI SAFE) ------------------
-        prompt = f"""
-You are an AI mentor for {st.session_state.module}.
-
-Rules:
-- Answer ONLY questions related to {st.session_state.module}.
-- If a question is unrelated, reply exactly:
-"Sorry, I don’t know about this question. Please ask something related to the selected module."
-- Explain clearly in a beginner-friendly way.
-
-Conversation so far:
-"""
-
-        for msg in st.session_state.chat:
-            role = "User" if msg["role"] == "user" else "AI"
-            prompt += f"{role}: {msg['content']}\n"
-
-        prompt += "\nAI:"
-
-        # ------------------ CALL GEMINI SAFELY ------------------
-        try:
-            ai_reply = response.content
-        except Exception:
-            ai_reply = (
-                "Sorry, I encountered an internal error while answering. "
-                "Please try rephrasing your question."
-            )
+        # Call LLM
+        model = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite")
+        response = model.invoke(st.session_state.memory)
 
         # Store AI response
-        st.session_state.chat.append({"role": "ai", "content": ai_reply})
+        st.session_state.chat.append({"role": "ai", "content": response.content})
+        st.session_state.memory.append(("ai", response.content))
 
         with st.chat_message("ai"):
-            st.write(ai_reply)
+            st.write(response.content)
 
-    # ------------------ DOWNLOAD CHAT FEATURE ------------------
+    # ------------------ DOWNLOAD CHAT FEATURE (MANDATORY) ------------------
     if st.session_state.chat:
         conversation_text = ""
         for msg in st.session_state.chat:
